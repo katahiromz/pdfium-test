@@ -5,6 +5,7 @@
 #include "fpdfview.h"
 #include "fpdf_edit.h"
 #include "fpdf_save.h"
+#include "ttc2ttf/ttc2ttf.h"
 
 double GetTextWidth(FPDF_DOCUMENT document, FPDF_PAGE page, FPDF_FONT font, const wchar_t* text, double font_size)
 {
@@ -27,26 +28,29 @@ double GetTextWidth(FPDF_DOCUMENT document, FPDF_PAGE page, FPDF_FONT font, cons
     return right - left;
 }
 
-FPDF_FONT LoadJapaneseFont(FPDF_DOCUMENT document, const char* font_path)
+FPDF_FONT LoadJapaneseFont(FPDF_DOCUMENT document, const char* font_path, int font_index = -1)
 {
-    std::ifstream font_file(font_path, std::ios::binary | std::ios::ate);
-    if (!font_file.is_open())
+    std::vector<char> input;
+    if (!file_read_all(font_path, input))
     {
         std::cerr << "Failed to open font file: " << font_path << std::endl;
         return nullptr;
     }
 
-    std::streamsize font_size = font_file.tellg();
-    font_file.seekg(0, std::ios::beg);
-
-    std::vector<char> font_data(font_size);
-    if (!font_file.read(font_data.data(), font_size))
+    std::vector<char> output;
+    if (font_index >= 0)
     {
-        std::cerr << "Failed to read font file: " << font_path << std::endl;
-        return nullptr;
+        TTC2TTF_RET ret = ttc2ttf_data_from_data(output, input, font_index);
+        if (ret != TTC2TTF_RET_NO_ERROR)
+            return nullptr;
+        input.clear();
+    }
+    else
+    {
+        output = std::move(input);
     }
 
-    FPDF_FONT font = FPDFText_LoadFont(document, reinterpret_cast<const uint8_t*>(font_data.data()), font_size, FPDF_FONT_TRUETYPE, true);
+    FPDF_FONT font = FPDFText_LoadFont(document, reinterpret_cast<const uint8_t *>(output.data()), output.size(), FPDF_FONT_TRUETYPE, false);
     if (!font)
         std::cerr << "Failed to load font from file: " << font_path << std::endl;
 
@@ -87,11 +91,12 @@ int main(void)
     }
 
     // Load a font
-    FPDF_FONT font = FPDFText_LoadStandardFont(document, "Arial");
+    //FPDF_FONT font = FPDFText_LoadStandardFont(document, "Arial");
     //FPDF_FONT font = LoadJapaneseFont(document, "C:\\USERS\\KATAHIROMZ\\APPDATA\\LOCAL\\MICROSOFT\\WINDOWS\\FONTS\\NOTOSERIFJP-REGULAR.TTF");
+    FPDF_FONT font = LoadJapaneseFont(document, "C:\\Windows\\Fonts\\msgothic.ttc", 2);
     if (!font)
     {
-        std::cerr << "FPDFText_LoadStandardFont failed" << std::endl;
+        std::cerr << "Loading font failed" << std::endl;
         FPDF_ClosePage(page);
         FPDF_CloseDocument(document);
         return -1;

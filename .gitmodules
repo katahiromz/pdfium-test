@@ -1,0 +1,3 @@
+[submodule "ttc2ttf"]
+	path = ttc2ttf
+	url = https://github.com/katahiromz/ttc2ttf
